@@ -430,22 +430,30 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, flags *RootFlags) error {
 		}
 	}
 
-	baseIndex := int64(1)
-	if c.Append {
-		baseIndex = insertIndex
-	}
-
 	var requests []*docs.Request
 	var textToInsert string
-	var formattingRequests []*docs.Request
-	var tables []TableData
 
 	if format == docsContentFormatMarkdown {
-		elements := ParseMarkdown(content)
-		formattingRequests, textToInsert, tables = MarkdownToDocsRequests(elements, baseIndex)
-	} else {
-		textToInsert = content
+		// Use sedmat engine for markdown conversion
+		sedExprs := MarkdownToSedmatExprs(content)
+		if !c.Append {
+			// Clear document first: s/^$// clears non-empty docs
+			sedExprs = append([]string{`s/^$//`}, sedExprs...)
+		}
+		sedCmd := &DocsSedCmd{DocID: id}
+		// Parse all expressions
+		var parsed []sedExpr
+		for i, raw := range sedExprs {
+			expr, parseErr := parseFullExpr(raw)
+			if parseErr != nil {
+				return fmt.Errorf("markdown sedmat expression %d (%q): %w", i+1, raw, parseErr)
+			}
+			parsed = append(parsed, expr)
+		}
+		return sedCmd.runBatch(ctx, u, account, id, parsed)
 	}
+
+	textToInsert = content
 
 	if c.Append {
 		requests = append(requests, &docs.Request{
@@ -454,9 +462,6 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, flags *RootFlags) error {
 				Text:     textToInsert,
 			},
 		})
-		if format == docsContentFormatMarkdown {
-			requests = append(requests, formattingRequests...)
-		}
 	} else {
 		if doc.Body != nil && len(doc.Body.Content) > 0 {
 			lastEl := doc.Body.Content[len(doc.Body.Content)-1]
@@ -479,10 +484,6 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, flags *RootFlags) error {
 				Text:     textToInsert,
 			},
 		})
-
-		if format == docsContentFormatMarkdown {
-			requests = append(requests, formattingRequests...)
-		}
 	}
 
 	_, err = svc.Documents.BatchUpdate(id, &docs.BatchUpdateDocumentRequest{
@@ -490,21 +491,6 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}).Context(ctx).Do()
 	if err != nil {
 		return fmt.Errorf("update document: %w", err)
-	}
-
-	if len(tables) > 0 {
-		tableInserter := NewTableInserter(svc, id)
-		tableOffset := int64(0)
-		for _, table := range tables {
-			tableIndex := table.StartIndex + tableOffset
-			tableEnd, err := tableInserter.InsertNativeTable(ctx, tableIndex, table.Cells)
-			if err != nil {
-				return fmt.Errorf("insert native table: %w", err)
-			}
-			if tableEnd > tableIndex {
-				tableOffset += (tableEnd - tableIndex) - 1
-			}
-		}
 	}
 
 	if outfmt.IsJSON(ctx) {
