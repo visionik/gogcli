@@ -61,6 +61,14 @@ func findBraceExprs(replacement string) (string, []*braceSpan) {
 			braceContent := replacement[i+1 : closeIdx]
 			rawBraces := replacement[i : closeIdx+1]
 
+			// {n} — paragraph break: emit a newline, no formatting span
+			if braceContent == "n" {
+				cleaned.WriteByte('\n')
+				cleanedPos++
+				i = closeIdx + 1
+				continue
+			}
+
 			expr, err := parseBraceExpr(braceContent)
 			if err != nil {
 				// Parse error — treat as literal
@@ -236,6 +244,10 @@ func looksLikeBraceExpr(content string) bool {
 	}
 
 	// Check for known patterns
+	// Paragraph break
+	if content == "n" {
+		return true
+	}
 	// Reset
 	if content == "0" || strings.HasPrefix(content, "0 ") {
 		return true

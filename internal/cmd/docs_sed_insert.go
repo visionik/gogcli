@@ -10,6 +10,13 @@ import (
 )
 
 func (c *DocsSedCmd) doPositionalInsert(ctx context.Context, docsSvc *docs.Service, u *ui.UI, id string, idx int64, replacement string) error {
+	return c.doPositionalInsertWithExpr(ctx, docsSvc, u, id, idx, replacement, nil)
+}
+
+// doPositionalInsertWithExpr inserts text at a position with optional brace formatting.
+// When expr is non-nil and has brace data, formatting is applied in a separate API call
+// after the text insertion (Google Docs doesn't reliably format text in the same batch).
+func (c *DocsSedCmd) doPositionalInsertWithExpr(ctx context.Context, docsSvc *docs.Service, u *ui.UI, id string, idx int64, replacement string, expr *sedExpr) error {
 	// Check for image syntax first
 	imgSpec := parseImageSyntax(replacement)
 
@@ -91,6 +98,39 @@ func (c *DocsSedCmd) doPositionalInsert(ctx context.Context, docsSvc *docs.Servi
 	})
 	if err != nil {
 		return fmt.Errorf("batch update (positional insert): %w", err)
+	}
+
+	// Apply brace formatting in a separate API call.
+	// The replacement text passed here is already cleaned (braces stripped by parseFullExpr),
+	// so we use the pre-parsed brace data from the sedExpr.
+	if expr != nil && (expr.brace != nil || len(expr.braceSpans) > 0) && plainText != "" {
+		var fmtRequests []*docs.Request
+		textEnd := idx + int64(len(plainText))
+
+		// Global brace formatting (only if it has actual format flags)
+		if expr.brace != nil && braceExprHasAnyFormat(expr.brace) {
+			fmtRequests = append(fmtRequests, buildBraceTextStyleRequests(expr.brace, idx, textEnd)...)
+		}
+		// Inline span formatting ({b=text}, {i=text}, etc.)
+		if len(expr.braceSpans) > 0 {
+			fmtRequests = append(fmtRequests, buildBraceInlineRequests(expr.braceSpans, idx)...)
+		}
+		// Paragraph-level brace formatting (headings, alignment, etc.)
+		if expr.brace != nil && hasBraceParagraphFormat(expr.brace) {
+			fmtRequests = append(fmtRequests, buildBraceParagraphStyleRequests(expr.brace, idx, textEnd)...)
+		}
+
+		if len(fmtRequests) > 0 {
+			err = retryOnQuota(ctx, func() error {
+				_, e := docsSvc.Documents.BatchUpdate(id, &docs.BatchUpdateDocumentRequest{
+					Requests: fmtRequests,
+				}).Context(ctx).Do()
+				return e
+			})
+			if err != nil {
+				return fmt.Errorf("batch update (brace formatting): %w", err)
+			}
+		}
 	}
 
 	// Fill pipe-table cells if content was provided

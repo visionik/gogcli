@@ -368,8 +368,11 @@ func parseFullExpr(raw string) (sedExpr, error) {
 	// Check for brace formatting in replacement (SEDMAT v3.5 syntax)
 	if hasBraceFormatting(replacement) {
 		cleanedText, spans := findBraceExprs(replacement)
-		if len(spans) > 0 {
+		// Always update replacement with cleaned text (e.g., {n} → \n)
+		if cleanedText != replacement {
 			expr.replacement = cleanedText
+		}
+		if len(spans) > 0 {
 			expr.braceSpans = spans
 			// If there's exactly one global span, use it as the main brace expr
 			if len(spans) == 1 && spans[0].IsGlobal {
