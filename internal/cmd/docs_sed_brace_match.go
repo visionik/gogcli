@@ -227,7 +227,7 @@ var valueKeySet = func() map[string]bool {
 		"a=", "align=", "o=", "opacity=", "n=", "indent=", "k=", "kerning=",
 		"x=", "width=", "y=", "height=", "p=", "spacing=", "e=", "effect=",
 		"cols=", "check", "toc", "img=", "T=", "@=", `"=`,
-		"d=", "dt=", "db=", "dl=", "dr=", "dc=", "ds=",
+		"d=", "dc=", "ds=",
 	}
 	m := make(map[string]bool, len(keys))
 	for _, k := range keys {
@@ -260,6 +260,19 @@ func looksLikeBraceExpr(content string) bool {
 		}
 		if content == "!"+flag || strings.HasPrefix(content, "!"+flag+" ") {
 			return true
+		}
+	}
+	// Border compound keys (d followed by any combo of t/b/l/r then =)
+	if len(content) >= 2 && content[0] == 'd' {
+		for i := 1; i < len(content); i++ {
+			ch := content[i]
+			if ch == 't' || ch == 'b' || ch == 'l' || ch == 'r' {
+				continue
+			}
+			if ch == '=' && i > 1 {
+				return true
+			}
+			break
 		}
 	}
 	// Value flags — check if content contains any known key prefix

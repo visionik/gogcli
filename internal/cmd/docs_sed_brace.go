@@ -288,31 +288,6 @@ func parseBraceKeyValue(key, val string, expr *braceExpr) error {
 		parseSpacing(val, expr)
 	case "e", "effect":
 		expr.Effect = val
-	case "d":
-		if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
-			expr.BorderAll = n
-			expr.BorderSet = true
-		}
-	case "dt":
-		if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
-			expr.BorderTop = n
-			expr.BorderSet = true
-		}
-	case "db":
-		if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
-			expr.BorderBottom = n
-			expr.BorderSet = true
-		}
-	case "dl":
-		if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
-			expr.BorderLeft = n
-			expr.BorderSet = true
-		}
-	case "dr":
-		if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
-			expr.BorderRight = n
-			expr.BorderSet = true
-		}
 	case "dc":
 		expr.BorderColor = resolveColor(val)
 		expr.BorderSet = true
@@ -344,6 +319,10 @@ func parseBraceKeyValue(key, val string, expr *braceExpr) error {
 	case "T":
 		expr.TableRef = val
 	default:
+		// Check for border compound keys: d, dt, db, dl, dr, dtb, dlr, dtblr, etc.
+		if parseBorderKey(key, val, expr) {
+			return nil
+		}
 		return fmt.Errorf("unknown key: %s", key)
 	}
 	return nil
@@ -391,6 +370,50 @@ func parseBareFlag(tok string, expr *braceExpr) error {
 }
 
 // parseSpacing parses the p= flag value: "12" (both) or "12,6" (above,below).
+// parseBorderKey handles border keys: d (all), dt, db, dl, dr, and compound
+// combinations like dtb (top+bottom), dlr (left+right), dtblr (all explicit), etc.
+// Returns true if the key was recognized as a border key.
+func parseBorderKey(key, val string, expr *braceExpr) bool {
+	if len(key) == 0 || key[0] != 'd' {
+		return false
+	}
+	sides := key[1:]
+	// "d" alone = all sides
+	if sides == "" {
+		n, err := strconv.ParseFloat(val, 64)
+		if err != nil || n < 0 {
+			return false
+		}
+		expr.BorderAll = n
+		expr.BorderSet = true
+		return true
+	}
+	// Validate all chars are valid side letters
+	for _, ch := range sides {
+		if ch != 't' && ch != 'b' && ch != 'l' && ch != 'r' {
+			return false
+		}
+	}
+	n, err := strconv.ParseFloat(val, 64)
+	if err != nil || n < 0 {
+		return false
+	}
+	expr.BorderSet = true
+	for _, ch := range sides {
+		switch ch {
+		case 't':
+			expr.BorderTop = n
+		case 'b':
+			expr.BorderBottom = n
+		case 'l':
+			expr.BorderLeft = n
+		case 'r':
+			expr.BorderRight = n
+		}
+	}
+	return true
+}
+
 func parseSpacing(val string, expr *braceExpr) {
 	expr.SpacingSet = true
 	if idx := strings.Index(val, ","); idx >= 0 {

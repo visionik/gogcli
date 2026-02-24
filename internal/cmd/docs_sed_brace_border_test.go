@@ -75,6 +75,58 @@ func TestBraceBorder_PerSideRequests(t *testing.T) {
 	assert.Nil(t, ps.BorderRight)
 }
 
+func TestBraceBorder_Compound_TopBottom(t *testing.T) {
+	expr, err := parseBraceExpr("dtb=2")
+	require.NoError(t, err)
+	assert.True(t, expr.BorderSet)
+	assert.Equal(t, 2.0, expr.BorderTop)
+	assert.Equal(t, 2.0, expr.BorderBottom)
+	assert.Equal(t, 0.0, expr.BorderLeft)
+	assert.Equal(t, 0.0, expr.BorderRight)
+}
+
+func TestBraceBorder_Compound_LeftRight(t *testing.T) {
+	expr, err := parseBraceExpr("dlr=3")
+	require.NoError(t, err)
+	assert.True(t, expr.BorderSet)
+	assert.Equal(t, 3.0, expr.BorderLeft)
+	assert.Equal(t, 3.0, expr.BorderRight)
+	assert.Equal(t, 0.0, expr.BorderTop)
+	assert.Equal(t, 0.0, expr.BorderBottom)
+}
+
+func TestBraceBorder_Compound_AllExplicit(t *testing.T) {
+	expr, err := parseBraceExpr("dtblr=1")
+	require.NoError(t, err)
+	assert.True(t, expr.BorderSet)
+	assert.Equal(t, 1.0, expr.BorderTop)
+	assert.Equal(t, 1.0, expr.BorderBottom)
+	assert.Equal(t, 1.0, expr.BorderLeft)
+	assert.Equal(t, 1.0, expr.BorderRight)
+}
+
+func TestBraceBorder_Compound_TopRight(t *testing.T) {
+	expr, err := parseBraceExpr("dtr=1.5 dc=red")
+	require.NoError(t, err)
+	assert.True(t, expr.BorderSet)
+	assert.Equal(t, 1.5, expr.BorderTop)
+	assert.Equal(t, 1.5, expr.BorderRight)
+	assert.Equal(t, 0.0, expr.BorderBottom)
+	assert.Equal(t, 0.0, expr.BorderLeft)
+	assert.NotEmpty(t, expr.BorderColor)
+}
+
+func TestBraceBorder_Compound_BuildRequests(t *testing.T) {
+	expr, _ := parseBraceExpr("dtb=2 dc=blue")
+	reqs := buildBraceParagraphStyleRequests(expr, 1, 10)
+	assert.NotEmpty(t, reqs)
+	ps := reqs[0].UpdateParagraphStyle.ParagraphStyle
+	assert.NotNil(t, ps.BorderTop)
+	assert.NotNil(t, ps.BorderBottom)
+	assert.Nil(t, ps.BorderLeft)
+	assert.Nil(t, ps.BorderRight)
+}
+
 func TestBorderDashStyleResolve(t *testing.T) {
 	assert.Equal(t, "SOLID", resolveBorderDashStyle(""))
 	assert.Equal(t, "SOLID", resolveBorderDashStyle("solid"))
