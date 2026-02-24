@@ -231,11 +231,11 @@ func (c *DocsSedCmd) runPositionalInsert(ctx context.Context, u *ui.UI, account,
 			return true, sedOutputOK(ctx, u, id, sedOutputKV{"cleared", 0})
 		}
 		// Empty doc — insert at index 1
-		return true, c.doPositionalInsert(ctx, docsSvc, u, id, 1, literalReplacement(expr.replacement))
+		return true, c.doPositionalInsertWithExpr(ctx, docsSvc, u, id, 1, literalReplacement(expr.replacement), false, &expr)
 
 	case "^":
 		// Prepend — insert at index 1 (beginning of body)
-		return true, c.doPositionalInsert(ctx, docsSvc, u, id, 1, literalReplacement(expr.replacement))
+		return true, c.doPositionalInsertWithExpr(ctx, docsSvc, u, id, 1, literalReplacement(expr.replacement), false, &expr)
 
 	case "$":
 		// Append — insert before the final newline
@@ -243,7 +243,7 @@ func (c *DocsSedCmd) runPositionalInsert(ctx context.Context, u *ui.UI, account,
 		if insertIdx < 1 {
 			insertIdx = 1
 		}
-		return true, c.doPositionalInsert(ctx, docsSvc, u, id, insertIdx, literalReplacement(expr.replacement))
+		return true, c.doPositionalInsertWithExpr(ctx, docsSvc, u, id, insertIdx, literalReplacement(expr.replacement), !isEmpty, &expr)
 	}
 
 	return false, nil
