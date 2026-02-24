@@ -218,6 +218,59 @@ func buildBraceParagraphStyleRequests(be *braceExpr, start, end int64) []*docs.R
 		}
 	}
 
+	// Paragraph borders
+	if be.BorderSet {
+		borderColor := be.BorderColor
+		if borderColor == "" {
+			borderColor = "#000000" // default black
+		}
+		dashStyle := resolveBorderDashStyle(be.BorderStyle)
+
+		makeBorder := func(widthPt float64) *docs.ParagraphBorder {
+			if widthPt == 0 {
+				// Zero width = remove border
+				return &docs.ParagraphBorder{
+					Width:     &docs.Dimension{Magnitude: 0, Unit: "PT"},
+					DashStyle: "SOLID",
+					Padding:   &docs.Dimension{Magnitude: 0, Unit: "PT"},
+				}
+			}
+			return &docs.ParagraphBorder{
+				Color:     hexColor(borderColor),
+				Width:     &docs.Dimension{Magnitude: widthPt, Unit: "PT"},
+				DashStyle: dashStyle,
+				Padding:   &docs.Dimension{Magnitude: borderPaddingPt, Unit: "PT"},
+			}
+		}
+
+		if be.BorderAll > 0 || (be.BorderAll == 0 && be.BorderTop == 0 && be.BorderBottom == 0 && be.BorderLeft == 0 && be.BorderRight == 0) {
+			// d=N applies to all sides; d=0 removes all
+			w := be.BorderAll
+			paraStyle.BorderTop = makeBorder(w)
+			paraStyle.BorderBottom = makeBorder(w)
+			paraStyle.BorderLeft = makeBorder(w)
+			paraStyle.BorderRight = makeBorder(w)
+			paraFields = append(paraFields, "borderTop", "borderBottom", "borderLeft", "borderRight")
+		}
+		// Per-side overrides
+		if be.BorderTop > 0 {
+			paraStyle.BorderTop = makeBorder(be.BorderTop)
+			paraFields = append(paraFields, "borderTop")
+		}
+		if be.BorderBottom > 0 {
+			paraStyle.BorderBottom = makeBorder(be.BorderBottom)
+			paraFields = append(paraFields, "borderBottom")
+		}
+		if be.BorderLeft > 0 {
+			paraStyle.BorderLeft = makeBorder(be.BorderLeft)
+			paraFields = append(paraFields, "borderLeft")
+		}
+		if be.BorderRight > 0 {
+			paraStyle.BorderRight = makeBorder(be.BorderRight)
+			paraFields = append(paraFields, "borderRight")
+		}
+	}
+
 	if len(paraFields) > 0 {
 		requests = append(requests, &docs.Request{
 			UpdateParagraphStyle: &docs.UpdateParagraphStyleRequest{
@@ -229,6 +282,46 @@ func buildBraceParagraphStyleRequests(be *braceExpr, start, end int64) []*docs.R
 	}
 
 	return requests
+}
+
+const borderPaddingPt = 4.0
+
+// resolveBorderDashStyle maps user-friendly names to Google Docs API dash styles.
+func resolveBorderDashStyle(s string) string {
+	switch strings.ToLower(s) {
+	case "dash", "dashed":
+		return "DASH"
+	case "dot", "dotted":
+		return "DOT"
+	case "dash_dot", "dashdot":
+		return "DASH_DOT"
+	case "long_dash", "longdash":
+		return "LONG_DASH"
+	case "long_dash_dot", "longdashdot":
+		return "LONG_DASH_DOT"
+	default:
+		return "SOLID"
+	}
+}
+
+// hexColor converts a hex color string to an OptionalColor.
+func hexColor(hex string) *docs.OptionalColor {
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) != 6 {
+		return greyColor(0) // fallback to black
+	}
+	r, _ := strconv.ParseInt(hex[0:2], 16, 64)
+	g, _ := strconv.ParseInt(hex[2:4], 16, 64)
+	b, _ := strconv.ParseInt(hex[4:6], 16, 64)
+	return &docs.OptionalColor{
+		Color: &docs.Color{
+			RgbColor: &docs.RgbColor{
+				Red:   float64(r) / 255.0,
+				Green: float64(g) / 255.0,
+				Blue:  float64(b) / 255.0,
+			},
+		},
+	}
 }
 
 // buildBraceInlineRequests handles inline scoping — multiple styled spans within one replacement.
@@ -398,7 +491,7 @@ func hasBraceParagraphFormat(be *braceExpr) bool {
 		return false
 	}
 	return be.Heading != "" || be.Align != "" || be.Indent >= 0 ||
-		be.Leading > 0 || be.SpacingSet
+		be.Leading > 0 || be.SpacingSet || be.BorderSet
 }
 
 // mergeBraceSpans merges multiple braceSpans into a single braceExpr for global formatting.

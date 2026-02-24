@@ -52,6 +52,16 @@ type braceExpr struct {
 	// Effect
 	Effect string // e=
 
+	// Paragraph borders
+	BorderAll    float64 // d= (all sides, pt; 0 = remove)
+	BorderTop    float64 // dt= (pt)
+	BorderBottom float64 // db= (pt)
+	BorderLeft   float64 // dl= (pt)
+	BorderRight  float64 // dr= (pt)
+	BorderColor  string  // dc= (color)
+	BorderStyle  string  // ds= (solid, dash, dot, dash_dot, long_dash, long_dash_dot)
+	BorderSet    bool    // whether any d/dt/db/dl/dr was specified
+
 	// Columns
 	Cols int // cols= (0 = not set)
 
@@ -278,6 +288,37 @@ func parseBraceKeyValue(key, val string, expr *braceExpr) error {
 		parseSpacing(val, expr)
 	case "e", "effect":
 		expr.Effect = val
+	case "d":
+		if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
+			expr.BorderAll = n
+			expr.BorderSet = true
+		}
+	case "dt":
+		if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
+			expr.BorderTop = n
+			expr.BorderSet = true
+		}
+	case "db":
+		if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
+			expr.BorderBottom = n
+			expr.BorderSet = true
+		}
+	case "dl":
+		if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
+			expr.BorderLeft = n
+			expr.BorderSet = true
+		}
+	case "dr":
+		if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
+			expr.BorderRight = n
+			expr.BorderSet = true
+		}
+	case "dc":
+		expr.BorderColor = resolveColor(val)
+		expr.BorderSet = true
+	case "ds":
+		expr.BorderStyle = strings.ToLower(val)
+		expr.BorderSet = true
 	case "cols":
 		if n, err := strconv.Atoi(val); err == nil && n >= 1 {
 			expr.Cols = n

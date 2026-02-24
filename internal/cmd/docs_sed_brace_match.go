@@ -227,6 +227,7 @@ var valueKeySet = func() map[string]bool {
 		"a=", "align=", "o=", "opacity=", "n=", "indent=", "k=", "kerning=",
 		"x=", "width=", "y=", "height=", "p=", "spacing=", "e=", "effect=",
 		"cols=", "check", "toc", "img=", "T=", "@=", `"=`,
+		"d=", "dt=", "db=", "dl=", "dr=", "dc=", "ds=",
 	}
 	m := make(map[string]bool, len(keys))
 	for _, k := range keys {
@@ -295,7 +296,7 @@ func braceExprHasAnyFormat(expr *braceExpr) bool {
 		expr.Size > 0 || expr.URL != "" || expr.Heading != "" || expr.Leading > 0 ||
 		expr.Align != "" || expr.Opacity > 0 || expr.Indent > indentNotSet || expr.Kerning != 0 ||
 		expr.Width > 0 || expr.Height > 0 || expr.SpacingSet || expr.Effect != "" ||
-		expr.Cols > 0 {
+		expr.Cols > 0 || expr.BorderSet {
 		return true
 	}
 	// Check special flags
